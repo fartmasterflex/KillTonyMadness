@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kill Tony Madness</title>
+    <style>
+        :root {
+            --neon-purple: #bc13fe;
+            --neon-blue: #13feeb;
+            --bg-dark: #0a0a0a;
+            --card-bg: #1a1a1a;
+            --text-main: #ffffff;
+            --border-color: #333;
+            --bracket-line: #555;
+            --nav-height: 60px;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* App-like feel */
+        }
+
+        /* --- HEADER --- */
+        header {
+            padding: 0 15px;
+            background: #000;
+            border-bottom: 2px solid var(--neon-purple);
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 100;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.2rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-shadow: 0 0 10px var(--neon-purple);
+        }
+
+        .header-controls button {
+            background: transparent;
+            border: 1px solid var(--neon-blue);
+            color: var(--neon-blue);
+            padding: 5px 10px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            margin-left: 5px;
+            border-radius: 4px;
+        }
+
+        /* --- VIEWPORT & BRACKET --- */
+        .bracket-viewport {
+            margin-top: 60px; /* Header space */
+            margin-bottom: var(--nav-height); /* Footer space */
+            height: calc(100vh - 120px);
+            overflow: auto;
+            position: relative;
+            background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%);
+            touch-action: pan-x pan-y;
+        }
+
+        .bracket-wrapper {
+            display: flex;
+            padding: 40px;
+            min-width: 100%; /* Allows shrinking in focus mode */
+            justify-content: center;
+            transform-origin: top center;
+            transition: transform 0.3s ease;
+        }
+
+        /* ROUNDS LAYOUT */
+        .round {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            width: 160px; /* Base width */
+            margin: 0 5px;
+            transition: all 0.3s ease;
+        }
+
+        /* MATCHUPS */
+        .matchup {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            margin-bottom: 10px;
+            position: relative;
+            flex-grow: 1; /* Stretch to fill space in quadrant view */
+        }
+
+        /* Lines */
+        .round:not(:last-child):not(:nth-child(5)) .matchup::after {
+            content: '';
+            position: absolute;
+            right: -8px;
+            top: 50%;
+            width: 8px;
+            height: 2px;
+            background: var(--bracket-line);
+        }
+
+        /* Slots & Tiles */
+        .slot {
+            width: 100%;
+            height: 50px;
+            background: #111;
+            border: 1px solid #333;
+            margin: 2px 0;
+            display: flex;
+            align-items: center;
+            padding: 0 4px;
+            position: relative;
+        }
+
+        .slot.drag-over {
+            background: rgba(19, 254, 235, 0.1);
+            border-color: var(--neon-blue);
+        }
+
+        .comedian-tile {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: grab;
+            font-size: 0.75rem;
+            user-select: none;
+        }
+        
+        .comedian-tile:active { cursor: grabbing; }
+
+        .seed-badge {
+            background: #333;
+            color: #aaa;
+            font-size: 0.65rem;
+            padding: 2px 4px;
+            border-radius: 3px;
+            margin-right: 5px;
+            min-width: 18px;
+            text-align: center;
+        }
+
+        .name-text {
+            flex-grow: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-weight: bold;
+        }
+
+        .play-btn {
+            background: none;
+            border: 1px solid var(--neon-blue);
+            color: var(--neon-blue);
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 0.6rem;
+            margin-left: 2px;
+            flex-shrink: 0;
+        }
+
+        /* --- NAVIGATION BAR (Bottom) --- */
+        .nav-bar {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            height: var(--nav-height);
+            background: #000;
+            border-top: 1px solid #333;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            z-index: 200;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        .nav-btn {
+            background: transparent;
+            border: none;
+            color: #666;
+            font-size: 0.7rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            width: 18%;
+        }
+
+        .nav-btn.active { color: var(--neon-blue); }
+        
+        .nav-icon {
+            font-size: 1.2rem;
+            margin-bottom: 2px;
+            display: block;
+        }
+
+        /* --- VISIBILITY CLASSES (The Magic) --- */
+        
+        /* Default: Show everything */
+        
+        /* Region Hiding Logic */
+        body.view-tl .region-bl, 
+        body.view-tl .side-right,
+        body.view-tl .final-round { display: none !important; }
+
+        body.view-bl .region-tl, 
+        body.view-bl .side-right,
+        body.view-bl .final-round { display: none !important; }
+
+        body.view-tr .region-br, 
+        body.view-tr .side-left,
+        body.view-tr .final-round { display: none !important; }
+
+        body.view-br .region-tr, 
+        body.view-br .side-left,
+        body.view-br .final-round { display: none !important; }
+
+        /* When zoomed in, maximize width */
+        body:not(.view-all) .bracket-wrapper {
+            width: 100%;
+            min-width: 0;
+            height: 100%;
+        }
+        body:not(.view-all) .round {
+            width: 30%; /* Expand columns to fit screen */
+            height: 100%;
+        }
+        body:not(.view-all) .slot {
+            height: 60px; /* Taller slots in focus mode */
+            font-size: 1rem;
+        }
+        body:not(.view-all) .comedian-tile {
+            font-size: 0.9rem;
+        }
+        
+        /* Full View specific tweaks */
+        body.view-all .bracket-wrapper {
+            min-width: 1200px; /* Force horizontal scroll on desktop */
+        }
+        
+        @media (max-width: 768px) {
+            /* Mobile Full View Scaling */
+            body.view-all .bracket-wrapper {
+                transform: scale(0.65); /* Shrink to fit more on mobile */
+                transform-origin: top left;
+                min-width: 150vw;
+            }
+        }
+
+
+        /* --- MODAL --- */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95); z-index: 2000;
+            justify-content: center; align-items: center;
+        }
+        .modal-content {
+            background: #111; border: 1px solid var(--neon-purple);
+            width: 90%; max-width: 400px; height: 80vh;
+            display: flex; flex-direction: column;
+        }
+        .modal-header, .modal-footer { padding: 15px; background: #222; text-align: center; }
+        .sortable-list { flex-grow: 1; overflow-y: auto; padding: 10px; }
+        .sort-item {
+            background: #222; border: 1px solid #444; padding: 10px;
+            margin-bottom: 5px; display: flex; align-items: center;
+        }
+        .sort-item.dragging { opacity: 0.5; background: var(--neon-purple); }
+
+    </style>
+</head>
+<body class="view-all">
+
+    <header>
+        <h1>Kill Tony <span style="color:var(--neon-blue)">Madness</span></h1>
+        <div class="header-controls">
+            <button onclick="openSeedModal()">Rankings</button>
+            <button onclick="resetBracket()">Reset</button>
+        </div>
+    </header>
+
+    <div class="bracket-viewport">
+        <div class="bracket-wrapper" id="bracketRoot">
+            <!-- Left Side -->
+            <div class="round side-left" id="L_R1"></div>
+            <div class="round side-left" id="L_R2"></div>
+            <div class="round side-left" id="L_R3"></div>
+            <div class="round side-left" id="L_R4"></div>
+            
+            <!-- Finals -->
+            <div class="round final-round" id="r_final" style="width: 200px; justify-content:center;"></div>
+            
+            <!-- Right Side -->
+            <div class="round side-right" id="R_R4"></div>
+            <div class="round side-right" id="R_R3"></div>
+            <div class="round side-right" id="R_R2"></div>
+            <div class="round side-right" id="R_R1"></div>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <div class="nav-bar">
+        <button class="nav-btn active" onclick="switchView('all', this)">
+            <span class="nav-icon">&#9783;</span> Full
+        </button>
+        <button class="nav-btn" onclick="switchView('tl', this)">
+            <span class="nav-icon">&#8598;</span> North West
+        </button>
+        <button class="nav-btn" onclick="switchView('bl', this)">
+            <span class="nav-icon">&#8601;</span> South West
+        </button>
+        <button class="nav-btn" onclick="switchView('tr', this)">
+            <span class="nav-icon">&#8599;</span> North East
+        </button>
+        <button class="nav-btn" onclick="switchView('br', this)">
+            <span class="nav-icon">&#8600;</span> South East
+        </button>
+    </div>
+
+    <!-- Seed Sorting Modal -->
+    <div class="modal-overlay" id="seedModal">
+        <div class="modal-content">
+            <div class="modal-header" style="color:var(--neon-blue)">Drag to Re-Rank (1-32)</div>
+            <div class="sortable-list" id="seedList"></div>
+            <div class="modal-footer">
+                <button onclick="closeSeedModal()" style="padding:8px;">Cancel</button>
+                <button onclick="saveNewSeeds()" style="padding:8px; background:var(--neon-blue); border:none; border-radius:4px;">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- VIEW CONTROL ---
+        function switchView(viewClass, btn) {
+            // Update Body Class
+            document.body.className = `view-${viewClass}`;
+            
+            // Update Buttons
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            if(btn) btn.classList.add('active');
+
+            // Reset scroll to top-left to ensure visibility
+            const viewport = document.querySelector('.bracket-viewport');
+            viewport.scrollTop = 0;
+            viewport.scrollLeft = 0;
+        }
+
+        // --- DATA ---
+        let comedians = [
+            { seed: 1, name: "Martin Phillips", ep: "412", vid: "bZ2mFX900FI", timeSec: 5940 },
+            { seed: 2, name: "Timmy No Brakes", ep: "723", vid: "R0y_PxhMdQ4", timeSec: 6120 },
+            { seed: 3, name: "Dedrick Flynn", ep: "743", vid: "S-hoyAhR0f0", timeSec: 4430 },
+            { seed: 4, name: "Fiona Cauley", ep: "668", vid: "2FU4rhSHw6Y", timeSec: 2820 },
+            { seed: 5, name: "Collin Sledge", ep: "708", vid: "GZuIpWgRzgo", timeSec: 4080 },
+            { seed: 6, name: "Jared Nathan", ep: "535", vid: "Lgnhr5hn7_4", timeSec: 1980 },
+            { seed: 7, name: "Tristan Bowling", ep: "345", vid: "rzE9Orncaa0", timeSec: 3780 },
+            { seed: 8, name: "Steve Lee", ep: "174", vid: "mh22ppLoDFQ", timeSec: 1710 },
+            { seed: 9, name: "Chris Silio", ep: "730", vid: "7AgDQxUvq6w", timeSec: 4470 },
+            { seed: 10, name: "Aya Amarir", ep: "564", vid: "tCP4PU5uvjE", timeSec: 2220 },
+            { seed: 11, name: "Kansei Yasuda", ep: "712", vid: "ezuyuoP5OI8", timeSec: 3360 },
+            { seed: 12, name: "Todd Royce", ep: "351", vid: "ByJ-ZGT-z2Y", timeSec: 5280 },
+            { seed: 13, name: "Ahren Belisle", ep: "596", vid: "g78aqz8QXTo", timeSec: 7200 },
+            { seed: 14, name: "Jack Shaw", ep: "669", vid: "JhTRTXrSE2I", timeSec: 5790 },
+            { seed: 15, name: "Ric Diez", ep: "628", vid: "w84ZJwq-Pjk", timeSec: 4440 },
+            { seed: 16, name: "Sir Winston Pickles", ep: "728", vid: "Yd3iQE3io3Y", timeSec: 2970 },
+            { seed: 17, name: "Uncle Lazer", ep: "568", vid: "AwmqfhzfSQ4", timeSec: 3870 },
+            { seed: 18, name: "David Jolly", ep: "619", vid: "av1kWX1mZaM", timeSec: 3450 },
+            { seed: 19, name: "Sarah Sloan", ep: "688", vid: "r2zQT6MvMXI", timeSec: 1530 },
+            { seed: 20, name: "JJ Alexander", ep: "737", vid: "qoMgBrV_7U8", timeSec: 1950 },
+            { seed: 21, name: "Mason Bird", ep: "729", vid: "xINfBBZBa3U", timeSec: 4950 },
+            { seed: 22, name: "Tony Scar", ep: "752", vid: "1XnqVp6Vy_k", timeSec: 2940 },
+            { seed: 23, name: "Yaqiao Yang", ep: "751.5", vid: "NETFLIX", timeSec: 960 },
+            { seed: 24, name: "Angel Diaz", ep: "754", vid: "oj5Qi7P9Gcc", timeSec: 4440 },
+            { seed: 25, name: "Tony Pepperoni", ep: "730", vid: "7AgDQxUvq6w", timeSec: 1280 },
+            { seed: 26, name: "Carlos Lopez", ep: "650", vid: "7aC45NttBxg", timeSec: 3180 },
+            { seed: 27, name: "Charlie Mac", ep: "720", vid: "auvj7zWVQHU", timeSec: 6780 },
+            { seed: 28, name: "Aloe Mean", ep: "360", vid: "vnSyAa9xl9Y", timeSec: 4770 },
+            { seed: 29, name: "Nicole Tran", ep: "385", vid: "zZPCRuaiLzU", timeSec: 2190 },
+            { seed: 30, name: "Enrique Chacon", ep: "248", vid: "JcsNiKvuTXQ", timeSec: 4800 },
+            { seed: 31, name: "Drew Nickens", ep: "665", vid: "1z9daChKJww", timeSec: 690 },
+            { seed: 32, name: "Heath Cordes", ep: "634", vid: "vKn_mWrHH78", timeSec: 5580 }
+        ];
+
+        // --- BUILD BRACKET ---
+        window.onload = function() { initBracket(); };
+
+        function initBracket() {
+            document.querySelectorAll('.round').forEach(r => r.innerHTML = '');
+            comedians.sort((a, b) => a.seed - b.seed);
+
+            // Left Side: TL = Top Left, BL = Bottom Left
+            const leftSeeds = [
+                [1, 32], [16, 17], [9, 24], [8, 25],  // TL
+                [5, 28], [12, 21], [13, 20], [4, 29]  // BL
+            ];
+            // Right Side: TR = Top Right, BR = Bottom Right
+            const rightSeeds = [
+                [3, 30], [14, 19], [11, 22], [6, 27], // TR
+                [7, 26], [10, 23], [15, 18], [2, 31]  // BR
+            ];
+
+            // Render Round 1 with Region Classes
+            renderRound1('L_R1', leftSeeds, 'tl', 'bl');
+            renderRound1('R_R1', rightSeeds, 'tr', 'br');
+
+            // Empty Rounds (We split logic for regions)
+            renderEmptyRound('L_R2', 4, 'tl', 'bl');
+            renderEmptyRound('L_R3', 2, 'tl', 'bl');
+            renderEmptyRound('L_R4', 1, 'tl', 'bl'); // Semis still effectively "belong" to top half for visibility usually, but let's just show for both? 
+            // Simplified: L_R4 is the Left Semi. It should show if TL OR BL is active? 
+            // For simplicity in this logic, we assign Matches to regions. 
+            // Semi-Final Left belongs to both TL and BL technically. 
+            // We will assign class "region-tl region-bl" to it? No, simpler to just NOT hide it.
+            // Actually, let's just classify them based on the tree.
+            
+            renderEmptyRound('R_R2', 4, 'tr', 'br');
+            renderEmptyRound('R_R3', 2, 'tr', 'br');
+            renderEmptyRound('R_R4', 1, 'tr', 'br');
+            
+            renderEmptyRound('r_final', 1, 'final', 'final');
+        }
+
+        function renderRound1(containerId, matchPairs, topRegion, botRegion) {
+            const container = document.getElementById(containerId);
+            matchPairs.forEach((pair, index) => {
+                const regionClass = (index < 4) ? `region-${topRegion}` : `region-${botRegion}`;
+                const c1 = comedians.find(c => c.seed === pair[0]);
+                const c2 = comedians.find(c => c.seed === pair[1]);
+                const matchup = createMatchup(regionClass);
+                matchup.children[0].innerHTML = createTileHTML(c1);
+                matchup.children[1].innerHTML = createTileHTML(c2);
+                container.appendChild(matchup);
+            });
+        }
+
+        function renderEmptyRound(containerId, count, topRegion, botRegion) {
+            const container = document.getElementById(containerId);
+            for(let i=0; i<count; i++) {
+                // Determine region based on index relative to count
+                // If count is 4: 0,1=Top, 2,3=Bot
+                // If count is 2: 0=Top, 1=Bot
+                // If count is 1: Both?
+                let regionClass = '';
+                if(count === 4) regionClass = (i < 2) ? `region-${topRegion}` : `region-${botRegion}`;
+                else if(count === 2) regionClass = (i < 1) ? `region-${topRegion}` : `region-${botRegion}`;
+                else regionClass = `region-${topRegion} region-${botRegion}`; // Belongs to both (Semis)
+                
+                const matchup = createMatchup(regionClass);
+                container.appendChild(matchup);
+            }
+        }
+
+        function createMatchup(regionClass) {
+            const m = document.createElement('div');
+            m.className = `matchup ${regionClass}`;
+            m.appendChild(createSlot());
+            m.appendChild(createSlot());
+            return m;
+        }
+
+        function createSlot() {
+            const d = document.createElement('div');
+            d.className = 'slot';
+            d.ondrop = drop;
+            d.ondragover = allowDrop;
+            d.ondragleave = dragLeave;
+            return d;
+        }
+
+        function createTileHTML(com) {
+            if (!com) return '';
+            let vidId = com.vid.trim().replace(/"/g, ''); 
+            return `
+                <div class="comedian-tile" draggable="true" ondragstart="drag(event)" id="tile_${com.seed}">
+                    <div style="display:flex; align-items:center; overflow:hidden;">
+                        <span class="seed-badge">${com.seed}</span>
+                        <span class="name-text">${com.name}</span>
+                    </div>
+                    <button class="play-btn" onclick="openVideo(event, '${vidId}', ${com.timeSec})">&#9654;</button>
+                </div>
+            `;
+        }
+
+        // --- INTERACTIONS ---
+        function allowDrop(ev) { ev.preventDefault(); ev.target.closest('.slot').classList.add('drag-over'); }
+        function dragLeave(ev) { ev.target.closest('.slot').classList.remove('drag-over'); }
+        function drag(ev) { ev.dataTransfer.setData("text/html", ev.target.outerHTML); }
+        function drop(ev) {
+            ev.preventDefault();
+            let slot = ev.target.closest('.slot');
+            slot.classList.remove('drag-over');
+            if (slot.innerHTML.trim() === "") slot.innerHTML = ev.dataTransfer.getData("text/html");
+        }
+        function openVideo(e, vidId, time) {
+            e.stopPropagation();
+            if (vidId.includes("NETFLIX")) alert("Watch on Netflix: 'Once Upon a Time in Texas'");
+            else window.open(`https://youtu.be/${vidId}?t=${time}`, '_blank');
+        }
+        function resetBracket() { if(confirm("Reset bracket?")) initBracket(); }
+
+        // --- RE-SEEDING ---
+        const seedList = document.getElementById("seedList");
+        let draggedItem = null;
+
+        function openSeedModal() {
+            document.getElementById('seedModal').style.display = 'flex';
+            seedList.innerHTML = '';
+            comedians.sort((a,b) => a.seed - b.seed);
+            comedians.forEach((com, i) => {
+                const item = document.createElement('div');
+                item.className = 'sort-item';
+                item.draggable = true;
+                item.dataset.name = com.name;
+                item.innerHTML = `<span style="width:30px;color:#888;">${i+1}.</span> ${com.name}`;
+                item.addEventListener('dragstart', () => { draggedItem = item; item.classList.add('dragging'); });
+                item.addEventListener('dragend', () => { draggedItem = null; item.classList.remove('dragging'); updateRanks(); });
+                seedList.appendChild(item);
+            });
+        }
+
+        function closeSeedModal() { document.getElementById('seedModal').style.display = 'none'; }
+        
+        seedList.addEventListener('dragover', e => {
+            e.preventDefault();
+            const afterElement = getDragAfterElement(seedList, e.clientY);
+            const draggable = document.querySelector('.dragging');
+            if (afterElement == null) seedList.appendChild(draggable);
+            else seedList.insertBefore(draggable, afterElement);
+        });
+
+        function getDragAfterElement(container, y) {
+            const draggableElements = [...container.querySelectorAll('.sort-item:not(.dragging)')];
+            return draggableElements.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const offset = y - box.top - box.height / 2;
+                if (offset < 0 && offset > closest.offset) return { offset: offset, element: child };
+                else return closest;
+            }, { offset: Number.NEGATIVE_INFINITY }).element;
+        }
+
+        function updateRanks() {
+            [...seedList.children].forEach((item, i) => item.children[0].innerText = (i + 1) + '.');
+        }
+
+        function saveNewSeeds() {
+            const items = seedList.querySelectorAll('.sort-item');
+            items.forEach((item, index) => {
+                const com = comedians.find(c => c.name === item.dataset.name);
+                if(com) com.seed = index + 1;
+            });
+            closeSeedModal();
+            initBracket();
+        }
+    </script>
+</body>
+</html>
